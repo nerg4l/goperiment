@@ -10,7 +10,6 @@ import (
 const inaccuracy = 17 * time.Millisecond
 
 func TestSchedule(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		p time.Duration
 		o time.Duration
@@ -36,6 +35,8 @@ func TestSchedule(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var w sync.WaitGroup
 			w.Add(2)
 
