@@ -7,8 +7,8 @@ import (
 
 // Schedule calls function f with period of p offsetted by o.
 // Similarly to cron a function schedules to one minute will
-// be executed every whole minute,  every minute after
-// initialization.
+// be executed every whole minute, not every minute after
+// initialisation.
 //
 // The parameter for f is the current time. Use this to
 // implement extra filters eg. do not run on specific weekday

@@ -17,7 +17,7 @@ func ExampleSchedule() {
 		// Do your job here
 	})
 
-	// Run a f twice a day at 03:40 (00:00 + 03:40) and 15:40 (12:00 + 03:40).
+	// Run f twice a day at 03:40 (00:00 + 03:40) and 15:40 (12:00 + 03:40).
 	xtime.Schedule(context.Background(), 12*time.Hour, 3*time.Hour+40*time.Minute, func(t time.Time) {
 		// Do your job here
 	})
