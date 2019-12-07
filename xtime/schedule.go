@@ -19,24 +19,24 @@ import (
 // F is executed in a goroutine which means multiple job can
 // be executed in the same time.
 func Schedule(ctx context.Context, p time.Duration, o time.Duration, f func(time.Time)) {
-	next := time.Now().Truncate(p).Add(o)
-	if next.Before(time.Now()) {
-		next = next.Add(p)
-	}
-
-	t := time.NewTimer(next.Sub(time.Now()))
-
 	go func() {
+		first := time.Now().Truncate(p).Add(o)
+		if first.Before(time.Now()) {
+			first = first.Add(p)
+		}
+		select {
+		case v := <-time.After(first.Sub(time.Now())):
+			go f(v)
+		case <-ctx.Done():
+			return
+		}
+		t := time.NewTicker(p)
 		for {
 			select {
 			case v := <-t.C:
-				next = next.Add(p)
-				t.Reset(next.Sub(time.Now()))
 				go f(v)
 			case <-ctx.Done():
-				if !t.Stop() {
-					<-t.C
-				}
+				t.Stop()
 				return
 			}
 		}
