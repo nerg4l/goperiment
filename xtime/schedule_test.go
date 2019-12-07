@@ -42,8 +42,8 @@ func TestSchedule(t *testing.T) {
 
 			var triggers []time.Time
 			ctx, cancel := context.WithCancel(context.Background())
-			Schedule(ctx, tt.args.p, tt.args.o, func(t time.Time) {
-				triggers = append(triggers, t)
+			Schedule(ctx, tt.args.p, tt.args.o, func(ctx context.Context, t time.Time) {
+				triggers = append(triggers, time.Now())
 				w.Done()
 			})
 
