@@ -6,15 +6,15 @@ import (
 )
 
 // Schedule calls function f with period of p offsetted by o.
-// Similarly to cron a function schedules to one minute will
-// be executed every whole minute, not every minute after
-// initialisation.
+// Similarly to cron a function with a period of two minutes
+// will be executed every even minute, not every two minutes
+// after initialisation.
 //
 // The parameter for f is the current time. Use this to
 // implement extra filters eg. do not run on specific weekday
 //
-// It is not recommended to have a greater offset than the
-// duration except if you want to skip the first n execution.
+// The first n execution can be skipped with an offset
+// greater then than the duration.
 //
 // F is executed in a goroutine which means multiple job can
 // be executed in the same time.
