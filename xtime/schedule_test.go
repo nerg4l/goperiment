@@ -37,18 +37,20 @@ func TestSchedule(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			ctx, cancel := context.WithCancel(context.Background())
+
 			var w sync.WaitGroup
 			w.Add(2)
+			go func() {
+				w.Wait()
+				cancel()
+			}()
 
 			var triggers []time.Time
-			ctx, cancel := context.WithCancel(context.Background())
 			Schedule(ctx, tt.args.p, tt.args.o, func(ctx context.Context, t time.Time) {
 				triggers = append(triggers, time.Now())
 				w.Done()
 			})
-
-			w.Wait()
-			cancel()
 
 			first := triggers[0]
 			second := triggers[1]
