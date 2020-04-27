@@ -8,9 +8,21 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 )
+
+type Executer interface {
+	Exec(context.Context, time.Time)
+}
+
+type ExecuterFunc func(context.Context, time.Time)
+
+func (f ExecuterFunc) Exec(ctx context.Context, now time.Time) {
+	f(ctx, now)
+}
 
 const (
 	firstMinute = 0
@@ -65,43 +77,14 @@ const (
 
 type cronFlag uint
 
-// Entry runs specified function at scheduled time.
-type Entry struct {
+// Cron runs specified function at scheduled time.
+type Cron struct {
 	minutes, hours, days, months, weekdays *big.Int
 
 	flags cronFlag
-
-	f func(context.Context, time.Time)
 }
 
-func (e Entry) hasFlag(cf cronFlag) bool {
-	return e.flags&cf > 0
-}
-
-func (e Entry) Do(ctx context.Context, t time.Time) {
-	h, m, _ := t.Clock()
-	if !e.hasFlag(minuteStar) && e.minutes.Bit(m-firstMinute) == 0 {
-		return
-	}
-	if !e.hasFlag(hourStar) && e.hours.Bit(h-firstHour) == 0 {
-		return
-	}
-	if e.months.Bit(t.Day()-firstMonth) == 0 {
-		return
-	}
-	// Commands are executed when the 'minute', 'hour',
-	// and 'month of the year' fields match the current
-	// time, and at least one of the two 'day' fields
-	// ('day of month', or 'day of week') match the
-	// current time
-	if !e.hasFlag(dayStar) && !e.hasFlag(weekdayStar) &&
-		e.days.Bit(t.Day()-firstDay) == 0 && e.weekdays.Bit(int(t.Weekday())-firstWeekday) == 0 {
-		return
-	}
-	e.f(ctx, t)
-}
-
-// NewEntry parses a string to create an Entry.
+// New parses a string to create an Cron.
 //
 // ┌───────────── minute (0 - 59)
 // │ ┌───────────── hour (0 - 23)
@@ -122,15 +105,14 @@ func (e Entry) Do(ctx context.Context, t time.Time) {
 // * @daily: Run once a day at midnight
 // * @midnight: Run once a day at midnight
 // * @hourly: Run once an hour at the beginning of the hour
-func NewEntry(s string, f func(context.Context, time.Time)) (c *Entry, err error) {
-	// TODO: panic on empty func
+func New(s string) (c *Cron, err error) {
 	var ch rune
 	reader := strings.NewReader(s)
 	if ch, _, err = reader.ReadRune(); err != nil {
-		return nil, errors.New("cannot parse empty string as definition")
+		return nil, errors.New("cron: cannot parse empty string as definition")
 	}
 
-	c = &Entry{f: f}
+	c = &Cron{}
 
 	if ch == '@' {
 		switch s {
@@ -170,7 +152,7 @@ func NewEntry(s string, f func(context.Context, time.Time)) (c *Entry, err error
 			c.weekdays = newCronRangeBetween(firstWeekday, lastWeekday).Bits()
 			c.flags = hourStar | dayStar | weekdayStar
 		default:
-			return nil, fmt.Errorf("cannot parse %s as predefined scheduling definition", s)
+			return nil, fmt.Errorf("cron: cannot parse %s as predefined scheduling definition", s)
 		}
 	} else {
 		var b *big.Int
@@ -179,32 +161,32 @@ func NewEntry(s string, f func(context.Context, time.Time)) (c *Entry, err error
 			c.flags |= minuteStar
 		}
 		if b, err = cs.ScanList(firstMinute, lastMinute, nil); err != nil {
-			return nil, fmt.Errorf("cannot parse minute part of scheduling definition: %w", err)
+			return nil, fmt.Errorf("cron: cannot parse minute part of scheduling definition: %w", err)
 		}
 		c.minutes = b
 		if cs.ch == '*' {
 			c.flags |= hourStar
 		}
 		if b, err = cs.ScanList(firstHour, lastHour, nil); err != nil {
-			return nil, fmt.Errorf("cannot parse hour part of scheduling definition: %w", err)
+			return nil, fmt.Errorf("cron: cannot parse hour part of scheduling definition: %w", err)
 		}
 		c.hours = b
 		if cs.ch == '*' {
 			c.flags |= dayStar
 		}
 		if b, err = cs.ScanList(firstDay, lastDay, nil); err != nil {
-			return nil, fmt.Errorf("cannot parse day part of scheduling definition: %w", err)
+			return nil, fmt.Errorf("cron: cannot parse day part of scheduling definition: %w", err)
 		}
 		c.days = b
 		if b, err = cs.ScanList(firstMonth, lastMonth, shortMonthNames); err != nil {
-			return nil, fmt.Errorf("cannot parse month part of scheduling definition: %w", err)
+			return nil, fmt.Errorf("cron: cannot parse month part of scheduling definition: %w", err)
 		}
 		c.months = b
 		if cs.ch == '*' {
 			c.flags |= weekdayStar
 		}
 		if b, err = cs.ScanList(firstWeekday, lastWeekday, shortDayNames); err != nil && err != io.EOF {
-			return nil, fmt.Errorf("cannot parse weekday part of scheduling definition: %w", err)
+			return nil, fmt.Errorf("cron: cannot parse weekday part of scheduling definition: %w", err)
 		}
 		c.weekdays = b
 	}
@@ -215,6 +197,34 @@ func NewEntry(s string, f func(context.Context, time.Time)) (c *Entry, err error
 	}
 
 	return c, nil
+}
+
+func (c Cron) hasFlag(cf cronFlag) bool {
+	return c.flags&cf > 0
+}
+
+func (c Cron) Check(t time.Time) bool {
+	h, m, _ := t.Clock()
+	if !c.hasFlag(minuteStar) && c.minutes.Bit(m-firstMinute) == 0 {
+		return false
+	}
+	if !c.hasFlag(hourStar) && c.hours.Bit(h-firstHour) == 0 {
+		return false
+	}
+	if c.months.Bit(t.Day()-firstMonth) == 0 {
+		return false
+	}
+	// Commands are executed when the 'minute', 'hour',
+	// and 'month of the year' fields match the current
+	// time, and at least one of the two 'day' fields
+	// ('day of month', or 'day of week') match the
+	// current time
+	if !c.hasFlag(dayStar) && !c.hasFlag(weekdayStar) &&
+		c.days.Bit(t.Day()-firstDay) == 0 && c.weekdays.Bit(int(t.Weekday())-firstWeekday) == 0 {
+		return false
+	}
+
+	return true
 }
 
 // cronRange contains details about a range
@@ -331,14 +341,14 @@ func (cs *cronScanner) scanRange(low, high int, names []string) (r cronRange, er
 		} else {
 			// eat the dash
 			if err = cs.readRune(); err != nil {
-				return r, fmt.Errorf("dash must be folowed by a value: %w", err)
+				return r, fmt.Errorf("cron: dash must be folowed by a value: %w", err)
 			}
 
 			// get the number following the dash
 			if r.to, err = cs.scanNumber(low, names, "/, \t\n"); err != nil {
 				return r, err
 			} else if r.from > r.to {
-				return r, errors.New("end of range must be greater than start of range")
+				return r, errors.New("cron: end of range must be greater than start of range")
 			}
 		}
 	}
@@ -357,18 +367,18 @@ func (cs *cronScanner) scanRange(low, high int, names []string) (r cronRange, er
 		if r.step, err = cs.scanNumber(0, nil, ", \t\n"); err != nil {
 			return r, err
 		} else if r.step == 0 {
-			return r, errors.New("step must be greater than 0")
+			return r, errors.New("cron: step must be greater than 0")
 		}
 	}
 
 	if r.to < low {
-		return r, fmt.Errorf("range end must be gerater than %d", low)
+		return r, fmt.Errorf("cron: range end must be gerater than %d", low)
 	}
 	if r.to > high {
-		return r, fmt.Errorf("range end must be lower than %d", high)
+		return r, fmt.Errorf("cron: range end must be lower than %d", high)
 	}
 	if r.step > high {
-		return r, fmt.Errorf("step must be lower than %d", high)
+		return r, fmt.Errorf("cron: step must be lower than %d", high)
 	}
 
 	return r, err
@@ -390,7 +400,7 @@ func (cs *cronScanner) scanNumber(low int, names []string, terms string) (num in
 		// got a number, check for valid terminator
 		if !strings.ContainsRune(terms, cs.ch) && err != io.EOF {
 			_ = cs.unreadRune()
-			return 0, fmt.Errorf("invalid terminator `%v`", cs.ch)
+			return 0, fmt.Errorf("cron: invalid terminator `%v`", cs.ch)
 		}
 		i, _ := strconv.Atoi(sb.String())
 		return i, nil
@@ -417,4 +427,151 @@ func (cs *cronScanner) scanNumber(low int, names []string, terms string) (num in
 
 	_ = cs.unreadRune()
 	return 0, io.EOF
+}
+
+type atomicBool int32
+
+func (b *atomicBool) isSet() bool { return atomic.LoadInt32((*int32)(b)) != 0 }
+func (b *atomicBool) setTrue()    { atomic.StoreInt32((*int32)(b), 1) }
+
+// ErrCrontabClosed is returned by the Crontab's Run method after a call to Shutdown or Close.
+var ErrCrontabClosed = errors.New("cron: Crontab closed")
+
+// NewCrontab allocates and returns a new Crontab.
+func NewCrontab() *Crontab { return new(Crontab) }
+
+// DefaultCrontab is the default Crontab used by Run.
+var DefaultCrontab = &defaultCrontab
+
+var defaultCrontab Crontab
+
+type Runner struct {
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
+	inShutdown atomicBool
+	mu         sync.Mutex
+
+	ct *Crontab
+}
+
+func (r *Runner) Run() error {
+	if r.inShutdown.isSet() {
+		return ErrCrontabClosed
+	}
+
+	r.mu.Lock()
+	var ctx context.Context
+	ctx, r.cancel = context.WithCancel(context.Background())
+	r.mu.Unlock()
+
+	if r.ct == nil {
+		r.ct = DefaultCrontab
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			break
+		case now := <-time.After(time.Minute):
+			r.ct.Do(ctx, now)
+		}
+	}
+}
+
+// Immediate
+func (r *Runner) Close() error {
+	r.inShutdown.setTrue()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.cancel != nil {
+		r.cancel()
+	}
+	return nil
+}
+
+// Graceful
+func (r *Runner) Shutdown(ctx context.Context) error {
+	r.inShutdown.setTrue()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	done := make(chan bool)
+	if r.cancel != nil {
+		r.cancel()
+
+		go func() {
+			r.wg.Wait()
+			close(done)
+		}()
+	} else {
+		close(done)
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
+	}
+}
+
+func Run() error {
+	r := Runner{}
+	return r.Run()
+}
+
+type Crontab struct {
+	mu      sync.Mutex
+	entries []*Entry
+}
+
+// Schedule registers the function for the given pattern.
+// If a pattern is incorrect, Schedule panics.
+func (ct *Crontab) Schedule(s string, executer Executer) {
+	c, err := New(s)
+	if err != nil {
+		panic(err.Error())
+	}
+	if executer == nil {
+		panic("cron: nil executer")
+	}
+
+	ct.mu.Lock()
+	defer ct.mu.Unlock()
+
+	e := Entry{cron: c, executer: executer}
+	ct.entries = append(ct.entries, &e)
+}
+
+func Schedule(s string, e Executer) {
+	DefaultCrontab.Schedule(s, e)
+}
+
+func (ct *Crontab) Do(ctx context.Context, now time.Time) {
+	ct.mu.Lock()
+	defer ct.mu.Unlock()
+	for _, e := range ct.entries {
+		e := e
+		go func() {
+			if e.Check(now) {
+				e.Exec(ctx, now)
+			}
+		}()
+	}
+}
+
+type Entry struct {
+	cron     *Cron
+	executer Executer
+}
+
+func NewEntry(cron *Cron, executer Executer) *Entry {
+	return &Entry{cron: cron, executer: executer}
+}
+
+func (e *Entry) Check(now time.Time) bool {
+	return e.cron.Check(now)
+}
+
+func (e *Entry) Exec(ctx context.Context, now time.Time) {
+	e.executer.Exec(ctx, now)
 }

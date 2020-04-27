@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestNewCron(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -15,7 +15,7 @@ func TestNewCron(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		wantC   *Entry
+		wantC   *Cron
 		wantErr bool
 	}{
 		{
@@ -92,7 +92,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `yearly`,
 			args: args{s: `@yearly`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0),
 				hours:    big.NewInt(0),
 				days:     big.NewInt(0),
@@ -104,7 +104,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `monthly`,
 			args: args{s: `@monthly`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0),
 				hours:    big.NewInt(0),
 				days:     big.NewInt(0),
@@ -116,7 +116,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `weekly`,
 			args: args{s: `@weekly`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0),
 				hours:    big.NewInt(0),
 				days:     big.NewInt(1<<31 - 1),
@@ -128,7 +128,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `daily`,
 			args: args{s: `@daily`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0),
 				hours:    big.NewInt(0),
 				days:     big.NewInt(1<<31 - 1),
@@ -140,7 +140,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `hourly`,
 			args: args{s: `@hourly`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -152,7 +152,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `every minute`,
 			args: args{s: `* * * * *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(1<<60 - 1),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -164,7 +164,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `minute with step`,
 			args: args{s: `*/2 * * * *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0b10101010101010101010101010101010101010101010101010101010101),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -176,7 +176,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `range of minutes`,
 			args: args{s: `0-2 * * * *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0b111),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -188,7 +188,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `range of minutes with step`,
 			args: args{s: `0-2/2 * * * *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0b101),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -200,7 +200,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `minute list`,
 			args: args{s: `0,2,5 * * * *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0b100101),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -212,7 +212,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `range of minutes list`,
 			args: args{s: `0-2/2,5-6 * * * *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(0b1100101),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -224,7 +224,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `sunday can be 7`,
 			args: args{s: `* * * * 7`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(1<<60 - 1),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -236,7 +236,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `month as string`,
 			args: args{s: `* * * JAN *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(1<<60 - 1),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -248,7 +248,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `range of months as string`,
 			args: args{s: `* * * JAN-FEB *`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(1<<60 - 1),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -260,7 +260,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `weekday as string`,
 			args: args{s: `* * * * SUN`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(1<<60 - 1),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -272,7 +272,7 @@ func TestNewCron(t *testing.T) {
 		{
 			name: `range of weekdays as string`,
 			args: args{s: `* * * * SUN-TUE`},
-			wantC: &Entry{
+			wantC: &Cron{
 				minutes:  big.NewInt(1<<60 - 1),
 				hours:    big.NewInt(1<<24 - 1),
 				days:     big.NewInt(1<<31 - 1),
@@ -287,14 +287,14 @@ func TestNewCron(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			gotC, err := NewEntry(tt.args.s, nil)
+			gotC, err := New(tt.args.s)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewEntry() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(gotC, tt.wantC) {
 				t.Errorf(`
-NewEntry() gotC = &{minutes:%x hours:%x days:%x months:%x weekdays:%x flags:%b},
+New() gotC = &{minutes:%x hours:%x days:%x months:%x weekdays:%x flags:%b},
         want &{minutes:%x hours:%x days:%x months:%x weekdays:%x flags:%b}`,
 					gotC.minutes, gotC.hours, gotC.days, gotC.months, gotC.weekdays, gotC.flags,
 					tt.wantC.minutes, tt.wantC.hours, tt.wantC.days, tt.wantC.months, tt.wantC.weekdays, tt.wantC.flags)
