@@ -7,16 +7,24 @@ import (
 	"strings"
 )
 
+// UnsafeDynamicHandler can handle HTTP request in an experimental and
+// unsafe way.
 type UnsafeDynamicHandler struct {
 	entries []func(host string, path string) http.Handler
 }
 
+// ServeHTTP serves an HTTP call by finding a matching handler in its entry
+// slice.
+//
+// This method does not use any mutex which makes it unsafe for concurrent use
+// of Append.
 func (m *UnsafeDynamicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host := stripHostPort(r.Host)
 	path := cleanPath(r.URL.Path)
 	// scanf scans space-separated values
 	path = strings.ReplaceAll(path, "/", " ")
-	e := m.entries
+	e := m.entries[:]
+	// Always end with not found.
 	e = append(e, func(host string, path string) http.Handler {
 		return http.NotFoundHandler()
 	})
@@ -26,15 +34,19 @@ func (m *UnsafeDynamicHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			continue
 		}
 		h.ServeHTTP(w, r)
-		return
 	}
 }
 
+// Append appends a new entry.
+//
+// This method does not use any mutex which makes it unsafe for concurrent use.
 func (m *UnsafeDynamicHandler) Append(f func(host string, path string) http.Handler) {
 	m.entries = append(m.entries, f)
 }
 
 // stripHostPort returns h without any trailing ":<port>".
+//
+// Borrowed from net/http/server.go
 func stripHostPort(h string) string {
 	// If no port on host, return unchanged
 	if strings.IndexByte(h, ':') == -1 {
@@ -48,6 +60,8 @@ func stripHostPort(h string) string {
 }
 
 // cleanPath returns the canonical path for p, eliminating . and .. elements.
+//
+// Borrowed from net/http/server.go
 func cleanPath(p string) string {
 	if p == "" {
 		return "/"
