@@ -4,7 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"hash"
+	"net/http"
+	"strings"
 )
 
 func randomString(l int) (string, error) {
@@ -31,4 +34,19 @@ func GenerateHashed(h hash.Hash) (string, error) {
 	}
 	h.Write([]byte(s))
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// ErrNoBearerToken is returned by GetRequestBearer when no authorization header
+// is set or the authorization header is not a bearer token.
+var ErrNoBearerToken = errors.New("token: no bearer token in request header")
+
+// GetRequestBearer returns the bearer token from the request when available.
+// It returns an ErrNoBearerToken error when missing or a hex error when the
+// token is not a valid hex.
+func GetRequestBearer(r *http.Request) ([]byte, error) {
+	authorization := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authorization, "Bearer ") {
+		return nil, ErrNoBearerToken
+	}
+	return hex.DecodeString(strings.TrimPrefix(authorization, "Bearer "))
 }
