@@ -19,21 +19,49 @@ func urlParse(rawurl string) *url.URL {
 }
 
 func TestSign(t *testing.T) {
-	secret := []byte("secret")
-	u, err := Sign(urlParse("https://example.com/1"), secret)
-	if err != nil {
-		t.Fatal(err)
+	type args struct {
+		ref *url.URL
+		key []byte
 	}
-	ok, err := ValidSignature(u, secret)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "relative",
+			args:    args{ref: urlParse("/?signature=any"), key: []byte("secret")},
+			wantErr: true,
+		},
+		{
+			name:    "already signed",
+			args:    args{ref: urlParse("https://example.com/?signature=any"), key: []byte("secret")},
+			wantErr: true,
+		},
+		{
+			name:    "valid",
+			args:    args{ref: urlParse("https://example.com/1"), key: []byte("secret")},
+			wantErr: false,
+		},
 	}
-	if !ok {
-		t.Error("Signed url must be valid")
-	}
-	ok = Expired(u)
-	if ok {
-		t.Error("Signed url must be valid")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Sign(tt.args.ref, tt.args.key)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Sign() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
+			ok, err := ValidSignature(got, tt.args.key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !ok {
+				t.Error("Sign() url must be valid")
+			}
+		})
 	}
 }
 
