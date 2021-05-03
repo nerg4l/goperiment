@@ -54,7 +54,7 @@ func TestSign(t *testing.T) {
 			if tt.wantErr {
 				return
 			}
-			ok, err := ValidSignature(got, tt.args.key)
+			ok, err := ValidSignature(urlParse(got), tt.args.key)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -75,14 +75,14 @@ func TestSignWithExpiration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := ValidSignature(u, secret)
+	ok, err := ValidSignature(urlParse(u), secret)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !ok {
 		t.Error("Signed url must be valid")
 	}
-	ok = Expired(u)
+	ok = Expired(urlParse(u))
 	if ok {
 		t.Error("Signed url must be valid")
 	}
@@ -95,7 +95,7 @@ func TestSignWithExpiration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok = Expired(u)
+	ok = Expired(urlParse(u))
 	if !ok {
 		t.Error("Signed url must be invalid")
 	}
@@ -104,7 +104,7 @@ func TestSignWithExpiration(t *testing.T) {
 func TestMiddleware(t *testing.T) {
 	sign := func(rawurl string, t time.Time, key []byte) string {
 		sign, _ := sign(urlParse(rawurl), t, key)
-		return sign.String()
+		return sign
 	}
 	type args struct {
 		baseURL *url.URL

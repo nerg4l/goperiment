@@ -11,22 +11,22 @@ import (
 	"time"
 )
 
-func Sign(ref *url.URL, key []byte) (*url.URL, error) {
+func Sign(ref *url.URL, key []byte) (string, error) {
 	return sign(ref, time.Time{}, key)
 }
 
-func SignWithExpiration(ref *url.URL, expires time.Time, key []byte) (*url.URL, error) {
+func SignWithExpiration(ref *url.URL, expires time.Time, key []byte) (string, error) {
 	return sign(ref, expires, key)
 }
 
-func sign(ref *url.URL, expires time.Time, key []byte) (*url.URL, error) {
+func sign(ref *url.URL, expires time.Time, key []byte) (string, error) {
 	u := *ref
 	if !u.IsAbs() {
-		return nil, fmt.Errorf("signedurl: only absolute urls can be signed")
+		return "", fmt.Errorf("signedurl: only absolute urls can be signed")
 	}
 	q := u.Query()
 	if _, ok := q["signature"]; ok {
-		return nil, fmt.Errorf("signedurl: signature is a preserved query parameter")
+		return "", fmt.Errorf("signedurl: signature is a preserved query parameter")
 	}
 	if !expires.IsZero() {
 		q["expires"] = []string{strconv.FormatInt(expires.Unix(), 10)}
@@ -37,7 +37,7 @@ func sign(ref *url.URL, expires time.Time, key []byte) (*url.URL, error) {
 	signature := hex.EncodeToString(mac.Sum(nil))
 	q.Add("signature", signature)
 	u.RawQuery = q.Encode()
-	return &u, nil
+	return u.String(), nil
 }
 
 func Middleware(baseURL *url.URL, key []byte) func(next http.Handler) http.Handler {
