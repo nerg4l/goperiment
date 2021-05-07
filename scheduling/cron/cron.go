@@ -14,13 +14,13 @@ import (
 	"unicode"
 )
 
-type Executer interface {
+type Executor interface {
 	Exec(context.Context, time.Time)
 }
 
-type ExecuterFunc func(context.Context, time.Time)
+type ExecutorFunc func(context.Context, time.Time)
 
-func (f ExecuterFunc) Exec(ctx context.Context, now time.Time) {
+func (f ExecutorFunc) Exec(ctx context.Context, now time.Time) {
 	f(ctx, now)
 }
 
@@ -69,9 +69,7 @@ var shortMonthNames = []string{
 }
 
 const (
-	minuteStar cronFlag = 1 << iota
-	hourStar
-	dayStar
+	dayStar cronFlag = 1 << iota
 	weekdayStar
 )
 
@@ -84,7 +82,7 @@ type Cron struct {
 	flags cronFlag
 }
 
-// New parses a string to create an Cron.
+// Parse parses a string to create an Cron.
 //
 // ┌───────────── minute (0 - 59)
 // │ ┌───────────── hour (0 - 23)
@@ -105,7 +103,7 @@ type Cron struct {
 // * @daily: Run once a day at midnight
 // * @midnight: Run once a day at midnight
 // * @hourly: Run once an hour at the beginning of the hour
-func New(s string) (c *Cron, err error) {
+func Parse(s string) (c *Cron, err error) {
 	var ch rune
 	reader := strings.NewReader(s)
 	if ch, _, err = reader.ReadRune(); err != nil {
@@ -150,23 +148,17 @@ func New(s string) (c *Cron, err error) {
 			c.days = newCronRangeBetween(firstDay, lastDay).Bits()
 			c.months = newCronRangeBetween(firstMonth, lastMonth).Bits()
 			c.weekdays = newCronRangeBetween(firstWeekday, lastWeekday).Bits()
-			c.flags = hourStar | dayStar | weekdayStar
+			c.flags = dayStar | weekdayStar
 		default:
 			return nil, fmt.Errorf("cron: cannot parse %s as predefined scheduling definition", s)
 		}
 	} else {
 		var b *big.Int
 		cs := cronScanner{scanner: reader, ch: ch}
-		if cs.ch == '*' {
-			c.flags |= minuteStar
-		}
 		if b, err = cs.ScanList(firstMinute, lastMinute, nil); err != nil {
 			return nil, fmt.Errorf("cron: cannot parse minute part of scheduling definition: %w", err)
 		}
 		c.minutes = b
-		if cs.ch == '*' {
-			c.flags |= hourStar
-		}
 		if b, err = cs.ScanList(firstHour, lastHour, nil); err != nil {
 			return nil, fmt.Errorf("cron: cannot parse hour part of scheduling definition: %w", err)
 		}
@@ -203,12 +195,12 @@ func (c Cron) hasFlag(cf cronFlag) bool {
 	return c.flags&cf > 0
 }
 
-func (c Cron) Check(t time.Time) bool {
+func (c Cron) ScheduledFor(t time.Time) bool {
 	h, m, _ := t.Clock()
-	if !c.hasFlag(minuteStar) && c.minutes.Bit(m-firstMinute) == 0 {
+	if c.minutes.Bit(m-firstMinute) == 0 {
 		return false
 	}
-	if !c.hasFlag(hourStar) && c.hours.Bit(h-firstHour) == 0 {
+	if c.hours.Bit(h-firstHour) == 0 {
 		return false
 	}
 	if c.months.Bit(t.Day()-firstMonth) == 0 {
@@ -526,23 +518,23 @@ type Crontab struct {
 
 // Schedule registers the function for the given pattern.
 // If a pattern is incorrect, Schedule panics.
-func (ct *Crontab) Schedule(s string, executer Executer) {
-	c, err := New(s)
+func (ct *Crontab) Schedule(s string, executor Executor) {
+	c, err := Parse(s)
 	if err != nil {
 		panic(err.Error())
 	}
-	if executer == nil {
-		panic("cron: nil executer")
+	if executor == nil {
+		panic("cron: nil executor")
 	}
 
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
 
-	e := Entry{cron: c, executer: executer}
+	e := Entry{cron: c, executor: executor}
 	ct.entries = append(ct.entries, &e)
 }
 
-func Schedule(s string, e Executer) {
+func Schedule(s string, e Executor) {
 	DefaultCrontab.Schedule(s, e)
 }
 
@@ -552,7 +544,7 @@ func (ct *Crontab) Do(ctx context.Context, now time.Time) {
 	for _, e := range ct.entries {
 		e := e
 		go func() {
-			if e.Check(now) {
+			if e.ScheduledFor(now) {
 				e.Exec(ctx, now)
 			}
 		}()
@@ -561,17 +553,17 @@ func (ct *Crontab) Do(ctx context.Context, now time.Time) {
 
 type Entry struct {
 	cron     *Cron
-	executer Executer
+	executor Executor
 }
 
-func NewEntry(cron *Cron, executer Executer) *Entry {
-	return &Entry{cron: cron, executer: executer}
+func NewEntry(cron *Cron, executor Executor) *Entry {
+	return &Entry{cron: cron, executor: executor}
 }
 
-func (e *Entry) Check(now time.Time) bool {
-	return e.cron.Check(now)
+func (e *Entry) ScheduledFor(now time.Time) bool {
+	return e.cron.ScheduledFor(now)
 }
 
 func (e *Entry) Exec(ctx context.Context, now time.Time) {
-	e.executer.Exec(ctx, now)
+	e.executor.Exec(ctx, now)
 }

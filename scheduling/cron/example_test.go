@@ -14,7 +14,7 @@ type countCmd struct {
 	n  int
 }
 
-func (h *countCmd) Command(ctx context.Context, time time.Time) {
+func (h *countCmd) Exec(ctx context.Context, time time.Time) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.n++
@@ -23,6 +23,6 @@ func (h *countCmd) Command(ctx context.Context, time time.Time) {
 
 func ExampleCron() {
 	cc := new(countCmd)
-	cron.Schedule("* * * * *", cc.Command)
+	cron.Schedule("* * * * *", cc)
 	log.Fatal(cron.Run())
 }

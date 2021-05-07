@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestNew(t *testing.T) {
@@ -146,7 +147,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -158,7 +159,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    minuteStar | hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -170,7 +171,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    minuteStar | hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -182,7 +183,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -194,7 +195,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -206,7 +207,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -218,7 +219,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -230,7 +231,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(0b10000001),
-				flags:    minuteStar | hourStar | dayStar,
+				flags:    dayStar,
 			},
 		},
 		{
@@ -242,7 +243,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(0b1),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    minuteStar | hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -254,7 +255,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(0b11),
 				weekdays: big.NewInt(1<<8 - 1),
-				flags:    minuteStar | hourStar | dayStar | weekdayStar,
+				flags:    dayStar | weekdayStar,
 			},
 		},
 		{
@@ -266,7 +267,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(0b10000001),
-				flags:    minuteStar | hourStar | dayStar,
+				flags:    dayStar,
 			},
 		},
 		{
@@ -278,7 +279,7 @@ func TestNew(t *testing.T) {
 				days:     big.NewInt(1<<31 - 1),
 				months:   big.NewInt(1<<12 - 1),
 				weekdays: big.NewInt(0b10000111),
-				flags:    minuteStar | hourStar | dayStar,
+				flags:    dayStar,
 			},
 		},
 	}
@@ -287,18 +288,100 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			gotC, err := New(tt.args.s)
+			gotC, err := Parse(tt.args.s)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
 				return
 			}
 			if !reflect.DeepEqual(gotC, tt.wantC) {
 				t.Errorf(`
-New() gotC = &{minutes:%x hours:%x days:%x months:%x weekdays:%x flags:%b},
+Parse() gotC = &{minutes:%x hours:%x days:%x months:%x weekdays:%x flags:%b},
         want &{minutes:%x hours:%x days:%x months:%x weekdays:%x flags:%b}`,
 					gotC.minutes, gotC.hours, gotC.days, gotC.months, gotC.weekdays, gotC.flags,
 					tt.wantC.minutes, tt.wantC.hours, tt.wantC.days, tt.wantC.months, tt.wantC.weekdays, tt.wantC.flags)
 			}
 		})
 	}
+}
+
+func TestCron_ScheduledFor(t *testing.T) {
+	t.Run("every minute", func(t *testing.T) {
+		c, err := Parse("* * * * *")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		var want bool
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 1, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+	})
+	t.Run("minute with step", func(t *testing.T) {
+		c, err := Parse("*/2 * * * *")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		var want bool
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = false
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 1, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 2, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+	})
+	t.Run("range of minutes", func(t *testing.T) {
+		c, err := Parse("0-1 * * * *")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		var want bool
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 1, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = false
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 2, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+	})
+	t.Run("range of minutes with step", func(t *testing.T) {
+		c, err := Parse("0,2 * * * *")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		var want bool
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = false
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 1, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 2, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+	})
 }
