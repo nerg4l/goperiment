@@ -81,6 +81,17 @@ type Cron struct {
 	flags cronFlag
 }
 
+// MustParse is like Parse but panics if the expression cannot be parsed.
+// It simplifies safe initialization of global variables holding compiled regular
+// expressions.
+func MustParse(s string) *Cron {
+	cron, err := Parse(s)
+	if err != nil {
+		panic(fmt.Sprintf("regexp: Compile(%q): %v", s, err))
+	}
+	return cron
+}
+
 // Parse parses a string to create an Cron.
 //
 //	┌───────────── minute (0 - 59)
