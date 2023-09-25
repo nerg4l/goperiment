@@ -83,15 +83,15 @@ type Cron struct {
 
 // Parse parses a string to create an Cron.
 //
-// ┌───────────── minute (0 - 59)
-// │ ┌───────────── hour (0 - 23)
-// │ │ ┌───────────── day of the month (1 - 31)
-// │ │ │ ┌───────────── month (1 - 12)
-// │ │ │ │ ┌───────────── day of the week (0 - 7) (0 - Sunday to  6 - Saturday;
-// │ │ │ │ │                                   7 is also Sunday for more predictability)
-// │ │ │ │ │
-// │ │ │ │ │
-// * * * * * command to execute
+//	┌───────────── minute (0 - 59)
+//	│ ┌───────────── hour (0 - 23)
+//	│ │ ┌───────────── day of the month (1 - 31)
+//	│ │ │ ┌───────────── month (1 - 12)
+//	│ │ │ │ ┌───────────── day of the week (0 - 7) (0 - Sunday to  6 - Saturday;
+//	│ │ │ │ │                                   7 is also Sunday for more predictability)
+//	│ │ │ │ │
+//	│ │ │ │ │
+//	* * * * * command to execute
 //
 // The following nonstandard predefined scheduling definitions can be used:
 //
