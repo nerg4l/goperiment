@@ -384,3 +384,175 @@ func TestCron_ScheduledFor(t *testing.T) {
 		}
 	})
 }
+
+func TestCron_After(t *testing.T) {
+	type args struct {
+		t time.Time
+	}
+	tests := []struct {
+		name string
+		cron *Cron
+		args args
+		want time.Time
+	}{
+		{
+			name: "incr minute from min",
+			cron: MustParse("0,30 * * * *"),
+			args: args{t: time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local),
+		},
+		{
+			name: "incr minute from max",
+			cron: MustParse("0,30 * * * *"),
+			args: args{t: time.Date(1990, 1, 1, 0, 29, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local),
+		},
+		{
+			name: "incr hour from min",
+			cron: MustParse("0,30 0,12 * * *"),
+			args: args{t: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 12, 0, 0, 0, time.Local),
+		},
+		{
+			name: "incr hour from max",
+			cron: MustParse("0,30 0,12 * * *"),
+			args: args{t: time.Date(1990, 1, 1, 11, 59, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 12, 0, 0, 0, time.Local),
+		},
+		{
+			name: "incr day from min",
+			cron: MustParse("0,30 0,12 1,15 * *"),
+			args: args{t: time.Date(1990, 1, 1, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "incr day from max",
+			cron: MustParse("0,30 0,12 1,15 * *"),
+			args: args{t: time.Date(1990, 1, 14, 23, 59, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "incr month from min",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 6, 1, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "incr month from max",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1990, 5, 31, 23, 59, 0, 0, time.Local)},
+			want: time.Date(1990, 6, 1, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "incr year from min",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1990, 6, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "incr year from max",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1990, 12, 31, 23, 59, 0, 0, time.Local)},
+			want: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "find first matching weekday",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN SAT"),
+			args: args{t: time.Date(1990, 6, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1991, 6, 1, 0, 0, 0, 0, time.Local),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.cron.After(tt.args.t); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("After() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCron_Before(t *testing.T) {
+	type args struct {
+		t time.Time
+	}
+	tests := []struct {
+		name string
+		cron *Cron
+		args args
+		want time.Time
+	}{
+		{
+			name: "decr minute from min",
+			cron: MustParse("0,30 * * * *"),
+			args: args{t: time.Date(1990, 1, 1, 0, 1, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "decr minute from max",
+			cron: MustParse("0,30 * * * *"),
+			args: args{t: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "decr hour from min",
+			cron: MustParse("0,30 0,12 * * *"),
+			args: args{t: time.Date(1990, 1, 1, 1, 00, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local),
+		},
+		{
+			name: "decr hour from max",
+			cron: MustParse("0,30 0,12 * * *"),
+			args: args{t: time.Date(1990, 1, 1, 11, 59, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local),
+		},
+		{
+			name: "decr day from min",
+			cron: MustParse("0,30 0,12 1,15 * *"),
+			args: args{t: time.Date(1990, 1, 2, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "decr day from max",
+			cron: MustParse("0,30 0,12 1,15 * *"),
+			args: args{t: time.Date(1990, 1, 14, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 1, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "decr month from min",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1990, 2, 0, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "decr month from max",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1990, 5, 31, 23, 59, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "decr year from min",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 6, 15, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "decr year from max",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
+			args: args{t: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 6, 15, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "find last matching weekday",
+			cron: MustParse("0,30 0,12 1,15 JAN,JUN MON"),
+			args: args{t: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.cron.Before(tt.args.t); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Before() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

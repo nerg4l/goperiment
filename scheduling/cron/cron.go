@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/bits"
 	"strconv"
 	"strings"
 	"sync"
@@ -226,6 +227,104 @@ func (c Cron) ScheduledFor(t time.Time) bool {
 	}
 
 	return true
+}
+
+// After returns the first time the cron scheduled for after u.
+func (c Cron) After(u time.Time) time.Time {
+	t := u.Add(time.Minute)
+	var (
+		diff int
+		over bool
+	)
+	diff, over = diffAfter(t.Minute(), firstMinute, lastMinute, c.minutes)
+	if over {
+		t = t.Add(time.Hour)
+	}
+	t = t.Add(time.Duration(diff) * time.Minute)
+	diff, over = diffAfter(t.Hour(), firstHour, lastHour, c.hours)
+	if over {
+		t = t.AddDate(0, 0, 1)
+	}
+	t = t.Add(time.Duration(diff) * time.Hour)
+	for {
+		diff, over = diffAfter(t.Day(), firstDay, lastDay, c.days)
+		if over {
+			t = t.AddDate(0, 1, 0)
+		}
+		t = t.AddDate(0, 0, diff)
+		diff, over = diffAfter(int(t.Month()), firstMonth, lastMonth, c.months)
+		if over {
+			t = t.AddDate(1, 0, 0)
+		}
+		t = t.AddDate(0, diff, 0)
+		if (c.weekdays & (1 << (t.Weekday() - firstWeekday))) > 0 {
+			break
+		}
+		t = t.AddDate(0, 0, 1)
+	}
+	return t
+}
+
+func diffAfter(current, first, last int, marks uint64) (diff int, overflow bool) {
+	c := current - first
+	if (marks & (1 << c)) > 0 {
+		return 0, false
+	}
+	d := bits.TrailingZeros64(marks &^ (1<<c - 1))
+	if d >= (last - first) {
+		d = -c + bits.TrailingZeros64(marks)
+		return d, true
+	}
+	return d - c, false
+}
+
+// Before returns the last time the cron scheduled for before u.
+func (c Cron) Before(u time.Time) time.Time {
+	t := u.Add(-time.Minute)
+	var (
+		diff  int
+		under bool
+	)
+	diff, under = diffBefore(t.Minute(), firstMinute, lastMinute, c.minutes)
+	if under {
+		t = t.Add(-time.Hour)
+	}
+	t = t.Add(time.Duration(diff) * time.Minute)
+	diff, under = diffBefore(t.Hour(), firstHour, lastHour, c.hours)
+	if under {
+		t = t.AddDate(0, 0, -1)
+	}
+	t = t.Add(time.Duration(diff) * time.Hour)
+	for {
+		diff, under = diffBefore(t.Day(), firstDay, lastDay, c.days)
+		if under {
+			t = t.AddDate(0, -1, 0)
+		}
+		t = t.AddDate(0, 0, diff)
+		diff, under = diffBefore(int(t.Month()), firstMonth, lastMonth, c.months)
+		if under {
+			t = t.AddDate(-1, 0, 0)
+		}
+		t = t.AddDate(0, diff, 0)
+		if (c.weekdays & (1 << (t.Weekday() - firstWeekday))) > 0 {
+			break
+		}
+		t = t.AddDate(0, 0, -1)
+	}
+	return t
+}
+
+func diffBefore(current, first, last int, marks uint64) (diff int, underflow bool) {
+	c := current - first
+	if (marks & (1 << c)) > 0 {
+		return 0, false
+	}
+	d := 64 - bits.LeadingZeros64(marks&(1<<c-1)) - 1
+	if d < 0 {
+		d = 64 - bits.LeadingZeros64(marks)
+		return d, true
+	}
+	return d - c, false
 }
 
 // cronRange contains details about a range
