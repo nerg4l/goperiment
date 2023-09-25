@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"strconv"
 	"strings"
 	"sync"
@@ -77,7 +76,7 @@ type cronFlag uint
 
 // Cron runs specified function at scheduled time.
 type Cron struct {
-	minutes, hours, days, months, weekdays *big.Int
+	minutes, hours, days, months, weekdays uint64
 
 	flags cronFlag
 }
@@ -115,35 +114,35 @@ func Parse(s string) (c *Cron, err error) {
 	if ch == '@' {
 		switch s {
 		case "@yearly", "@annually": // 0 0 1 1 *
-			c.minutes = big.NewInt(0)
-			c.hours = big.NewInt(0)
-			c.days = big.NewInt(0)
-			c.months = big.NewInt(0)
+			c.minutes = 0
+			c.hours = 0
+			c.days = 0
+			c.months = 0
 			c.weekdays = newCronRangeBetween(firstWeekday, lastWeekday).Bits()
 			c.flags = weekdayStar
 		case "@monthly": // 0 0 1 * *
-			c.minutes = big.NewInt(0)
-			c.hours = big.NewInt(0)
-			c.days = big.NewInt(0)
+			c.minutes = 0
+			c.hours = 0
+			c.days = 0
 			c.months = newCronRangeBetween(firstMonth, lastMonth).Bits()
 			c.weekdays = newCronRangeBetween(firstWeekday, lastWeekday).Bits()
 			c.flags = weekdayStar
 		case "@weekly": // 0 0 * * 0
-			c.minutes = big.NewInt(0)
-			c.hours = big.NewInt(0)
+			c.minutes = 0
+			c.hours = 0
 			c.days = newCronRangeBetween(firstDay, lastDay).Bits()
 			c.months = newCronRangeBetween(firstMonth, lastMonth).Bits()
-			c.weekdays = big.NewInt(0)
+			c.weekdays = 0
 			c.flags = dayStar
 		case "@daily", "@midnight": // 0 0 * * *
-			c.minutes = big.NewInt(0)
-			c.hours = big.NewInt(0)
+			c.minutes = 0
+			c.hours = 0
 			c.days = newCronRangeBetween(firstDay, lastDay).Bits()
 			c.months = newCronRangeBetween(firstMonth, lastMonth).Bits()
 			c.weekdays = newCronRangeBetween(firstWeekday, lastWeekday).Bits()
 			c.flags = dayStar | weekdayStar
 		case "@hourly": // 0 * * * *
-			c.minutes = big.NewInt(0)
+			c.minutes = 0
 			c.hours = newCronRangeBetween(firstHour, lastHour).Bits()
 			c.days = newCronRangeBetween(firstDay, lastDay).Bits()
 			c.months = newCronRangeBetween(firstMonth, lastMonth).Bits()
@@ -153,7 +152,7 @@ func Parse(s string) (c *Cron, err error) {
 			return nil, fmt.Errorf("cron: cannot parse %s as predefined scheduling definition", s)
 		}
 	} else {
-		var b *big.Int
+		var b uint64
 		cs := cronScanner{scanner: reader, ch: ch}
 		if b, err = cs.ScanList(firstMinute, lastMinute, nil); err != nil {
 			return nil, fmt.Errorf("cron: cannot parse minute part of scheduling definition: %w", err)
@@ -183,9 +182,8 @@ func Parse(s string) (c *Cron, err error) {
 		c.weekdays = b
 	}
 
-	if c.weekdays.Bit(0) == 1 || c.weekdays.Bit(7) == 1 {
-		c.weekdays.SetBit(c.weekdays, 0, 1)
-		c.weekdays.SetBit(c.weekdays, 7, 1)
+	if c.weekdays&0b10000001 > 0 {
+		c.weekdays = c.weekdays | 0b10000001
 	}
 
 	return c, nil
@@ -197,13 +195,13 @@ func (c Cron) hasFlag(cf cronFlag) bool {
 
 func (c Cron) ScheduledFor(t time.Time) bool {
 	h, m, _ := t.Clock()
-	if c.minutes.Bit(m-firstMinute) == 0 {
+	if (c.minutes & (1 << (m - firstMinute))) == 0 {
 		return false
 	}
-	if c.hours.Bit(h-firstHour) == 0 {
+	if (c.hours & (1 << (h - firstHour))) == 0 {
 		return false
 	}
-	if c.months.Bit(t.Day()-firstMonth) == 0 {
+	if (c.months & (1 << (t.Day() - firstMonth))) == 0 {
 		return false
 	}
 	// Commands are executed when the 'minute', 'hour',
@@ -212,7 +210,7 @@ func (c Cron) ScheduledFor(t time.Time) bool {
 	// ('day of month', or 'day of week') match the
 	// current time
 	if !c.hasFlag(dayStar) && !c.hasFlag(weekdayStar) &&
-		c.days.Bit(t.Day()-firstDay) == 0 && c.weekdays.Bit(int(t.Weekday())-firstWeekday) == 0 {
+		(c.days&(1<<(t.Day()-firstDay))) == 0 && (c.weekdays&(1<<(int(t.Weekday())-firstWeekday))) == 0 {
 		return false
 	}
 
@@ -240,8 +238,8 @@ func newCronRangeBetween(low, high int) cronRange {
 // Bits outputs a range as a bitset
 //
 // Zero value for cr.step will cause panic
-func (cr cronRange) Bits() *big.Int {
-	b := big.NewInt(0)
+func (cr cronRange) Bits() uint64 {
+	var b uint64
 	f := cr.from - cr.offset
 	t := cr.to - cr.offset
 	// set all elements from `f` to `t`, stepping by `step`
@@ -250,7 +248,7 @@ func (cr cronRange) Bits() *big.Int {
 		panic("step can not be zero")
 	}
 	for i := f; i <= t; i += s {
-		b.SetBit(b, i, 1)
+		b = b | 1<<i
 	}
 	return b
 }
@@ -275,15 +273,15 @@ func (cs *cronScanner) unreadRune() (err error) {
 //
 // A list is a sequence of comma separated
 // cron ranges.
-func (cs *cronScanner) ScanList(low, high int, names []string) (b *big.Int, err error) {
-	b = big.NewInt(0)
+func (cs *cronScanner) ScanList(low, high int, names []string) (b uint64, err error) {
+	b = 0
 	for {
 		if r, err := cs.scanRange(low, high, names); err == io.EOF {
-			return b.Add(b, r.Bits()), err
+			return b | r.Bits(), err
 		} else if err != nil {
 			return b, err
 		} else {
-			b = b.Add(b, r.Bits())
+			b = b | r.Bits()
 		}
 		if cs.ch == ',' {
 			if err = cs.readRune(); err != nil {
