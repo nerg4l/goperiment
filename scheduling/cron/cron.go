@@ -231,7 +231,13 @@ func (c Cron) ScheduledFor(t time.Time) bool {
 
 // After returns the first time the cron scheduled for after u.
 func (c Cron) After(u time.Time) time.Time {
-	t := u.Add(time.Minute)
+	subsec := time.Duration(u.Second())*time.Second + time.Duration(u.Nanosecond())
+	var t time.Time
+	if subsec > 0 {
+		t = u.Add(time.Minute - subsec)
+	} else {
+		t = u.Add(time.Minute)
+	}
 	var (
 		diff int
 		over bool
@@ -280,7 +286,13 @@ func diffAfter(current, first, last int, marks uint64) (diff int, overflow bool)
 
 // Before returns the last time the cron scheduled for before u.
 func (c Cron) Before(u time.Time) time.Time {
-	t := u.Add(-time.Minute)
+	subsec := time.Duration(u.Second())*time.Second + time.Duration(u.Nanosecond())
+	var t time.Time
+	if subsec > 0 {
+		t = u.Add(-subsec)
+	} else {
+		t = u.Add(-time.Minute)
+	}
 	var (
 		diff  int
 		under bool

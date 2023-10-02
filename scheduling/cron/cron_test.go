@@ -404,7 +404,7 @@ func TestCron_After(t *testing.T) {
 		{
 			name: "incr minute from max",
 			cron: MustParse("0,30 * * * *"),
-			args: args{t: time.Date(1990, 1, 1, 0, 29, 0, 0, time.Local)},
+			args: args{t: time.Date(1990, 1, 1, 0, 29, 59, 999999999, time.Local)},
 			want: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local),
 		},
 		{
@@ -416,7 +416,7 @@ func TestCron_After(t *testing.T) {
 		{
 			name: "incr hour from max",
 			cron: MustParse("0,30 0,12 * * *"),
-			args: args{t: time.Date(1990, 1, 1, 11, 59, 0, 0, time.Local)},
+			args: args{t: time.Date(1990, 1, 1, 11, 59, 59, 999999999, time.Local)},
 			want: time.Date(1990, 1, 1, 12, 0, 0, 0, time.Local),
 		},
 		{
@@ -428,7 +428,7 @@ func TestCron_After(t *testing.T) {
 		{
 			name: "incr day from max",
 			cron: MustParse("0,30 0,12 1,15 * *"),
-			args: args{t: time.Date(1990, 1, 14, 23, 59, 0, 0, time.Local)},
+			args: args{t: time.Date(1990, 1, 14, 23, 59, 59, 999999999, time.Local)},
 			want: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local),
 		},
 		{
@@ -440,7 +440,7 @@ func TestCron_After(t *testing.T) {
 		{
 			name: "incr month from max",
 			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
-			args: args{t: time.Date(1990, 5, 31, 23, 59, 0, 0, time.Local)},
+			args: args{t: time.Date(1990, 5, 31, 23, 59, 59, 999999999, time.Local)},
 			want: time.Date(1990, 6, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
@@ -452,7 +452,7 @@ func TestCron_After(t *testing.T) {
 		{
 			name: "incr year from max",
 			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
-			args: args{t: time.Date(1990, 12, 31, 23, 59, 0, 0, time.Local)},
+			args: args{t: time.Date(1990, 12, 31, 23, 59, 59, 999999999, time.Local)},
 			want: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
@@ -502,7 +502,7 @@ func TestCron_Before(t *testing.T) {
 		{
 			name: "decr hour from max",
 			cron: MustParse("0,30 0,12 * * *"),
-			args: args{t: time.Date(1990, 1, 1, 11, 59, 0, 0, time.Local)},
+			args: args{t: time.Date(1990, 1, 1, 11, 59, 59, 999999999, time.Local)},
 			want: time.Date(1990, 1, 1, 0, 30, 0, 0, time.Local),
 		},
 		{
@@ -526,7 +526,7 @@ func TestCron_Before(t *testing.T) {
 		{
 			name: "decr month from max",
 			cron: MustParse("0,30 0,12 1,15 JAN,JUN *"),
-			args: args{t: time.Date(1990, 5, 31, 23, 59, 0, 0, time.Local)},
+			args: args{t: time.Date(1990, 5, 31, 23, 59, 59, 999999999, time.Local)},
 			want: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local),
 		},
 		{
