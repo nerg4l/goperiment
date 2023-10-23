@@ -1,4 +1,4 @@
-package scheduling
+package schedule
 
 import (
 	"context"
@@ -47,10 +47,18 @@ func TestSchedule(t *testing.T) {
 			}()
 
 			var triggers []time.Time
-			Schedule(ctx, tt.args.p, tt.args.o, func(ctx context.Context, t time.Time) {
-				triggers = append(triggers, time.Now())
-				w.Done()
-			})
+			s := NewSchedule(ctx, tt.args.p, tt.args.o)
+
+		loop:
+			for {
+				select {
+				case t := <-s.C:
+					triggers = append(triggers, t)
+					w.Done()
+				case <-ctx.Done():
+					break loop
+				}
+			}
 
 			first := triggers[0]
 			second := triggers[1]
