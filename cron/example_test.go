@@ -3,7 +3,7 @@ package cron_test
 import (
 	"context"
 	"fmt"
-	"github.com/nerg4l/goperiment/scheduling/cron"
+	"github.com/nerg4l/goperiment/cron"
 	"log"
 	"sync"
 	"time"
