@@ -383,6 +383,52 @@ func TestCron_ScheduledFor(t *testing.T) {
 			t.Errorf("ScheduledFor() = %v, want %v", got, want)
 		}
 	})
+	t.Run("two 'day' fields", func(t *testing.T) {
+		c, err := Parse("* * * * 1")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		var want bool
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = false
+		if got := c.ScheduledFor(time.Date(1990, 1, 2, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		c, err = Parse("* * 1 * *")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = false
+		if got := c.ScheduledFor(time.Date(1990, 1, 2, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		c, err = Parse("* * 1 * 3")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = false
+		if got := c.ScheduledFor(time.Date(1990, 1, 2, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+		want = true
+		if got := c.ScheduledFor(time.Date(1990, 1, 3, 0, 0, 0, 0, time.Local)); got != want {
+			t.Errorf("ScheduledFor() = %v, want %v", got, want)
+		}
+	})
 }
 
 func TestCron_After(t *testing.T) {
@@ -456,10 +502,58 @@ func TestCron_After(t *testing.T) {
 			want: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 23 JAN,JUN MON"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 22, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 23 JAN,JUN SUN"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 21, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 23 JAN,JUN SAT"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 20, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 23 JAN,JUN FRI"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 19, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 23 JAN,JUN THU"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 18, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 23 JAN,JUN WED"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 17, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 23 JAN,JUN TUE"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 16, 0, 0, 0, 0, time.Local),
+		},
+		{
 			name: "find first matching weekday",
-			cron: MustParse("0,30 0,12 1,15 JAN,JUN SAT"),
-			args: args{t: time.Date(1990, 6, 15, 12, 30, 0, 0, time.Local)},
-			want: time.Date(1991, 6, 1, 0, 0, 0, 0, time.Local),
+			cron: MustParse("0,30 0,12 * JAN,JUN MON"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 22, 0, 0, 0, 0, time.Local),
+		},
+		{
+			name: "day of month before weekday",
+			cron: MustParse("0,30 0,12 21 JAN,JUN MON"),
+			args: args{t: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 21, 0, 0, 0, 0, time.Local),
 		},
 	}
 	for _, tt := range tests {
@@ -543,9 +637,57 @@ func TestCron_Before(t *testing.T) {
 		},
 		{
 			name: "find last matching weekday",
-			cron: MustParse("0,30 0,12 1,15 JAN,JUN MON"),
-			args: args{t: time.Date(1991, 1, 1, 0, 0, 0, 0, time.Local)},
-			want: time.Date(1990, 1, 15, 12, 30, 0, 0, time.Local),
+			cron: MustParse("0,30 0,12 * JAN,JUN MON"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 8, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "find last matching weekday",
+			cron: MustParse("0,30 0,12 * JAN,JUN TUE"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 9, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "find last matching weekday",
+			cron: MustParse("0,30 0,12 * JAN,JUN WED"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 10, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "find last matching weekday",
+			cron: MustParse("0,30 0,12 * JAN,JUN THU"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 11, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "find last matching weekday",
+			cron: MustParse("0,30 0,12 * JAN,JUN FRI"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 12, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "find last matching weekday",
+			cron: MustParse("0,30 0,12 * JAN,JUN SAT"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 13, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "find last matching weekday",
+			cron: MustParse("0,30 0,12 * JAN,JUN SUN"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 14, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "weekday before day of month",
+			cron: MustParse("0,30 0,12 7 JAN,JUN MON"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 8, 12, 30, 0, 0, time.Local),
+		},
+		{
+			name: "day of month before weekday",
+			cron: MustParse("0,30 0,12 9 JAN,JUN MON"),
+			args: args{t: time.Date(1990, 1, 15, 0, 0, 0, 0, time.Local)},
+			want: time.Date(1990, 1, 9, 12, 30, 0, 0, time.Local),
 		},
 	}
 	for _, tt := range tests {

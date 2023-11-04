@@ -221,12 +221,14 @@ func (c Cron) ScheduledFor(t time.Time) bool {
 	// time, and at least one of the two 'day' fields
 	// ('day of month', or 'day of week') match the
 	// current time
-	if !c.hasFlag(dayStar) && !c.hasFlag(weekdayStar) &&
-		(c.days&(1<<(t.Day()-firstDay))) == 0 && (c.weekdays&(1<<(int(t.Weekday())-firstWeekday))) == 0 {
-		return false
+	if !c.hasFlag(dayStar) && (c.days&(1<<(t.Day()-firstDay))) != 0 {
+		return true
+	}
+	if !c.hasFlag(weekdayStar) && (c.weekdays&(1<<(int(t.Weekday())-firstWeekday))) != 0 {
+		return true
 	}
 
-	return true
+	return c.hasFlag(dayStar) && c.hasFlag(weekdayStar)
 }
 
 // After returns the first time the cron scheduled for after u.
@@ -252,22 +254,43 @@ func (c Cron) After(u time.Time) time.Time {
 		t = t.AddDate(0, 0, 1)
 	}
 	t = t.Add(time.Duration(diff) * time.Hour)
-	for {
+	// Commands are executed when the 'minute', 'hour',
+	// and 'month of the year' fields match the current
+	// time, and at least one of the two 'day' fields
+	// ('day of month', or 'day of week') match the
+	// current time
+	var days []time.Time
+	if !c.hasFlag(dayStar) {
+		td := t
 		diff, over = diffAfter(t.Day(), firstDay, lastDay, c.days)
 		if over {
-			t = t.AddDate(0, 1, 0)
+			td = td.AddDate(0, 1, 0)
 		}
-		t = t.AddDate(0, 0, diff)
-		diff, over = diffAfter(int(t.Month()), firstMonth, lastMonth, c.months)
-		if over {
-			t = t.AddDate(1, 0, 0)
-		}
-		t = t.AddDate(0, diff, 0)
-		if (c.weekdays & (1 << (t.Weekday() - firstWeekday))) > 0 {
-			break
-		}
-		t = t.AddDate(0, 0, 1)
+		td = td.AddDate(0, 0, diff)
+		days = append(days, td)
 	}
+	if !c.hasFlag(weekdayStar) {
+		tw := t
+		diff, over = diffAfter(int(t.Weekday()), firstWeekday, lastWeekday, c.weekdays)
+		if over {
+			tw = tw.AddDate(0, 0, 7)
+		}
+		tw = tw.AddDate(0, 0, diff)
+		days = append(days, tw)
+	}
+	if len(days) != 0 {
+		t = days[0]
+		for i := range days {
+			if days[i].Before(t) {
+				t = days[i]
+			}
+		}
+	}
+	diff, over = diffAfter(int(t.Month()), firstMonth, lastMonth, c.months)
+	if over {
+		t = t.AddDate(1, 0, 0)
+	}
+	t = t.AddDate(0, diff, 0)
 	return t
 }
 
@@ -307,22 +330,43 @@ func (c Cron) Before(u time.Time) time.Time {
 		t = t.AddDate(0, 0, -1)
 	}
 	t = t.Add(time.Duration(diff) * time.Hour)
-	for {
+	// Commands are executed when the 'minute', 'hour',
+	// and 'month of the year' fields match the current
+	// time, and at least one of the two 'day' fields
+	// ('day of month', or 'day of week') match the
+	// current time
+	var days []time.Time
+	if !c.hasFlag(dayStar) {
+		td := t
 		diff, under = diffBefore(t.Day(), firstDay, lastDay, c.days)
 		if under {
-			t = t.AddDate(0, -1, 0)
+			td = td.AddDate(0, -1, 0)
 		}
-		t = t.AddDate(0, 0, diff)
-		diff, under = diffBefore(int(t.Month()), firstMonth, lastMonth, c.months)
-		if under {
-			t = t.AddDate(-1, 0, 0)
-		}
-		t = t.AddDate(0, diff, 0)
-		if (c.weekdays & (1 << (t.Weekday() - firstWeekday))) > 0 {
-			break
-		}
-		t = t.AddDate(0, 0, -1)
+		td = td.AddDate(0, 0, diff)
+		days = append(days, td)
 	}
+	if !c.hasFlag(weekdayStar) {
+		tw := t
+		diff, under = diffBefore(int(t.Weekday()), firstWeekday, lastWeekday, c.weekdays)
+		if under {
+			tw = tw.AddDate(0, 0, -8)
+		}
+		tw = tw.AddDate(0, 0, diff)
+		days = append(days, tw)
+	}
+	if len(days) != 0 {
+		t = days[0]
+		for i := range days {
+			if days[i].After(t) {
+				t = days[i]
+			}
+		}
+	}
+	diff, under = diffBefore(int(t.Month()), firstMonth, lastMonth, c.months)
+	if under {
+		t = t.AddDate(-1, 0, 0)
+	}
+	t = t.AddDate(0, diff, 0)
 	return t
 }
 
